@@ -1,6 +1,6 @@
 # User Assistance Exercise: Nexus Docs Pipeline API
 
-You've just joined the documentation team at **Nexus**, a fictional SaaS company. The engineering team shipped the **Nexus Docs Pipeline API** — a REST API that lets teams manage their docs-as-code publishing workflow programmatically. Your job: write the public-facing docs.
+You've just joined the documentation team at **Nexus**, a fictional SaaS company. The engineering team shipped the **Nexus Docs Pipeline API** - a REST API that lets teams manage their docs-as-code publishing workflow programmatically. Your job: write the public-facing docs.
 
 ---
 
@@ -24,7 +24,7 @@ You've just joined the documentation team at **Nexus**, a fictional SaaS company
 
 ## Tasks
 
-### Task 1 — Complete the OpenAPI spec (~45 min)
+### Task 1 - Complete the OpenAPI spec (~45 min)
 
 Open `exercise/openapi-stub.yaml`. Find every `# TODO` comment and complete it:
 
@@ -39,7 +39,7 @@ Open `exercise/openapi-stub.yaml`. Find every `# TODO` comment and complete it:
 
 ---
 
-### Task 2 — Rewrite the Getting Started guide (~30 min)
+### Task 2 - Rewrite the Getting Started guide (~30 min)
 
 Open `exercise/getting-started-draft.md`. Rewrite it following the style guide. The draft works as an implementation note but reads like it was written for engineers, not users.
 
@@ -51,7 +51,7 @@ Open `exercise/getting-started-draft.md`. Rewrite it following the style guide. 
 
 ---
 
-### Task 3 — Style guide audit (~15 min)
+### Task 3 - Style guide audit (~15 min)
 
 Review your completed work against `exercise/style-guide.md`. Use this checklist:
 
