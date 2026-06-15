@@ -1,0 +1,434 @@
+openapi: 3.0.3
+info:
+  title: Nexus Docs Pipeline API
+  version: 1.0.0
+  description: |
+    The Nexus Docs Pipeline API lets you manage your docs-as-code publishing workflow
+    programmatically. Use it to trigger builds, monitor build status, publish approved
+    content, and manage content metadata.
+  contact:
+    name: Nexus Developer Support
+    email: api-support@nexus.example.com
+
+servers:
+  - url: https://api.nexus.example.com/v1
+    description: Production
+
+security:
+  - bearerAuth: []
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Components
+# ─────────────────────────────────────────────────────────────────────────────
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: |
+        All requests require a Bearer token. Generate one at nexus.example.com/settings/tokens.
+        Tokens expire after 90 days.
+
+  schemas:
+
+    # ── Build (fully documented — use as a reference for your own work) ───────
+    Build:
+      type: object
+      properties:
+        id:
+          type: string
+          example: bld_01HX9K2N3P
+          description: Unique identifier for the build.
+        status:
+          type: string
+          enum: [queued, building, succeeded, failed, cancelled]
+          description: |
+            Current build status.
+            - `queued` — build is waiting to start
+            - `building` — build is in progress
+            - `succeeded` — build completed without errors
+            - `failed` — build encountered one or more errors; check `logs_url` for details
+            - `cancelled` — build was manually stopped before completion
+        source_ref:
+          type: string
+          example: main
+          description: Git branch, tag, or commit SHA that was built.
+        created_at:
+          type: string
+          format: date-time
+          example: "2026-06-10T07:00:00Z"
+          description: ISO 8601 timestamp when the build was created.
+        completed_at:
+          type: string
+          format: date-time
+          nullable: true
+          example: "2026-06-10T07:02:34Z"
+          description: ISO 8601 timestamp when the build finished. Null if the build is still in progress.
+        logs_url:
+          type: string
+          format: uri
+          example: https://api.nexus.example.com/v1/builds/bld_01HX9K2N3P/logs
+          description: URL to retrieve the full build log.
+        published_url:
+          type: string
+          format: uri
+          nullable: true
+          example: https://docs.nexus.example.com
+          description: URL where the build was published. Null if the build has not been published.
+
+    # ── ContentItem (incomplete — Task 1: complete this schema) ──────────────
+    ContentItem:
+      type: object
+      properties:
+        slug:
+          type: string
+          # TODO: Add a description explaining what a slug is and its format.
+          # Then add an example (hint: slugs use "/" as path separators,
+          # e.g. "getting-started/quickstart").
+        title:
+          type: string
+          # TODO: Add a description and a realistic example.
+        status:
+          type: string
+          enum: [draft, published, archived]
+          # TODO: Describe what each status value means for the content item.
+          # Follow the same pattern used for Build.status above.
+        last_modified_at:
+          type: string
+          format: date-time
+          # TODO: Add a description and example.
+        author:
+          type: string
+          # TODO: Add a description and example (use an email address format).
+
+    # ── Error (fully documented) ──────────────────────────────────────────────
+    Error:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          type: string
+          example: build_not_found
+          description: Machine-readable error identifier.
+        message:
+          type: string
+          example: No build found with ID bld_01HX9K2N3P.
+          description: Human-readable explanation of the error.
+        details:
+          type: object
+          description: Additional context about the error, if available.
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Paths
+# ─────────────────────────────────────────────────────────────────────────────
+
+paths:
+
+  # ── POST /builds (fully documented — use as a reference) ─────────────────
+  /builds:
+    post:
+      summary: Trigger a build
+      description: |
+        Starts a new build from the specified Git ref. The build runs asynchronously —
+        this endpoint returns immediately with a `queued` status. Use
+        `GET /builds/{buildId}` to poll for completion.
+      operationId: createBuild
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [source_ref]
+              properties:
+                source_ref:
+                  type: string
+                  description: Git branch, tag, or commit SHA to build from.
+                  example: main
+                notify_on_complete:
+                  type: boolean
+                  default: false
+                  description: |
+                    When `true`, Nexus sends an email to the authenticated user when the
+                    build finishes, regardless of the outcome. Defaults to `false`.
+            example:
+              source_ref: main
+              notify_on_complete: true
+      responses:
+        "201":
+          description: Build created and queued.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Build"
+              example:
+                id: bld_01HX9K2N3P
+                status: queued
+                source_ref: main
+                created_at: "2026-06-10T07:00:00Z"
+                completed_at: null
+                logs_url: https://api.nexus.example.com/v1/builds/bld_01HX9K2N3P/logs
+                published_url: null
+        "400":
+          description: The request body is invalid.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                code: invalid_ref
+                message: "source_ref 'nonexistent-branch' does not exist in the repository."
+        "401":
+          description: Missing or invalid Bearer token.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                code: unauthorized
+                message: Bearer token is missing or has expired.
+
+    # ── GET /builds (fully documented) ───────────────────────────────────────
+    get:
+      summary: List builds
+      description: |
+        Returns a list of recent builds, sorted by creation time (newest first).
+        Use the `status` query parameter to filter by build state.
+      operationId: listBuilds
+      parameters:
+        - name: status
+          in: query
+          required: false
+          description: Filter builds by status. Returns all builds when omitted.
+          schema:
+            type: string
+            enum: [queued, building, succeeded, failed, cancelled]
+        - name: limit
+          in: query
+          required: false
+          description: Maximum number of builds to return. Defaults to 20. Maximum is 100.
+          schema:
+            type: integer
+            default: 20
+            maximum: 100
+      responses:
+        "200":
+          description: A list of builds matching the filter.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Build"
+                  total:
+                    type: integer
+                    description: Total number of builds matching the filter.
+              example:
+                data:
+                  - id: bld_01HX9K2N3P
+                    status: succeeded
+                    source_ref: main
+                    created_at: "2026-06-10T07:00:00Z"
+                    completed_at: "2026-06-10T07:02:34Z"
+                    logs_url: https://api.nexus.example.com/v1/builds/bld_01HX9K2N3P/logs
+                    published_url: https://docs.nexus.example.com
+                total: 1
+        "401":
+          description: Missing or invalid Bearer token.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  # ── GET /builds/{buildId} (incomplete — Task 1) ───────────────────────────
+  /builds/{buildId}:
+    get:
+      summary: Get a build
+      # TODO: Write a description following the three-question rule in the style guide:
+      # 1. What does this endpoint do?
+      # 2. When would a user call it? (hint: this is the primary way to poll an async build)
+      # 3. What should the user do with the response?
+      operationId: getBuild
+      parameters:
+        - name: buildId
+          in: path
+          required: true
+          schema:
+            type: string
+          # TODO: Add a description and a realistic example value.
+      responses:
+        "200":
+          description: Build found.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Build"
+              # TODO: Add a response example showing a completed, succeeded build.
+              # Use realistic values — refer to the Build schema for all fields.
+        "404":
+          description: No build found with the specified ID.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              # TODO: Add a response example.
+        "401":
+          description: Missing or invalid Bearer token.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  # ── POST /builds/{buildId}/publish (incomplete — Task 1) ─────────────────
+  /builds/{buildId}/publish:
+    post:
+      summary: Publish a build
+      # TODO: Write a description. Cover:
+      # - which builds can be published (only status: succeeded)
+      # - what publishing does (replaces the currently live version at the docs URL)
+      # - whether this is synchronous or asynchronous
+      operationId: publishBuild
+      parameters:
+        - name: buildId
+          in: path
+          required: true
+          schema:
+            type: string
+          # TODO: Add a description and example.
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                environment:
+                  type: string
+                  enum: [staging, production]
+                  default: production
+                  # TODO: Describe what staging vs production means for the user.
+                  # What URL does each environment publish to?
+            # TODO: Add a request body example.
+      responses:
+        "200":
+          # TODO: Write the response description and add a full example showing the
+          # Build object after a successful publish (published_url should now be populated).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Build"
+        "409":
+          # TODO: This error fires when the build's status is not "succeeded".
+          # Write the description and add a response example for a build that failed.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: No build found with the specified ID.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Missing or invalid Bearer token.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  # ── GET + PUT /content/{slug} (incomplete — Task 1) ──────────────────────
+  /content/{slug}:
+    get:
+      summary: Get a content item
+      # TODO: Write a description.
+      operationId: getContent
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema:
+            type: string
+          # TODO: Describe the slug format and provide an example.
+          # Slugs use "/" as path separators: e.g. "getting-started/quickstart"
+      responses:
+        "200":
+          description: Content item found.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ContentItem"
+              # TODO: Add a full response example using the ContentItem schema.
+        "404":
+          # TODO: Add description and response example.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Missing or invalid Bearer token.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+    put:
+      summary: Update a content item
+      # TODO: Write a description. Clarify:
+      # - which fields can be updated (title and status only — slug is immutable)
+      # - what happens when you set a published item's status to "archived"
+      operationId: updateContent
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema:
+            type: string
+          # TODO: Add description and example (same as GET /content/{slug}).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title:
+                  type: string
+                  # TODO: Add description and example.
+                status:
+                  type: string
+                  enum: [draft, published, archived]
+                  # TODO: Add description.
+            # TODO: Add a full request body example.
+      responses:
+        "200":
+          # TODO: Add description and a response example showing the updated ContentItem.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ContentItem"
+        "400":
+          # TODO: Add description and example for a validation error.
+          # Hint: what happens if you try to move a "draft" directly to "archived"
+          # without publishing it first?
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: No content item found with the specified slug.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Missing or invalid Bearer token.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
